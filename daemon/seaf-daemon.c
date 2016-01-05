@@ -16,6 +16,10 @@
 #include <glib.h>
 #include <glib-object.h>
 
+#ifdef HAVE_BREAKPAD_SUPPORT
+#include <c_bpwrapper.h>
+#endif // HAVE_BREAKPAD_SUPPORT
+
 #include <ccnet.h>
 #include <searpc-server.h>
 #include <searpc-client.h>
@@ -380,6 +384,9 @@ bind_ccnet_service (const char *config_dir)
 int
 main (int argc, char **argv)
 {
+#ifdef HAVE_BREAKPAD_SUPPORT
+    newCBPWrapperExceptionHandler();
+#endif
     int c;
     char *config_dir = DEFAULT_CONFIG_DIR;
     char *seafile_dir = NULL;
