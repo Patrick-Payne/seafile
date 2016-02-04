@@ -10,8 +10,10 @@ AM_CFLAGS = -DPKGDATADIR=\"$(pkgdatadir)\" \
 	@SEARPC_CFLAGS@ \
 	@GLIB2_CFLAGS@ \
 	@MSVC_CFLAGS@ \
-	@CURL_CFLAGS@
-	-Wall
+	@CURL_CFLAGS@ \
+	-Wall \
+	-pg \
+	-lduet
 
 bin_PROGRAMS = 
 if !SERVER_ONLY
