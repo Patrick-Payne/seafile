@@ -13,6 +13,7 @@ AM_CFLAGS = -DPKGDATADIR=\"$(pkgdatadir)\" \
 	@CURL_CFLAGS@ \
 	-Wall \
 	-pg \
+	-fno-omit-frame-pointer \
 	-lduet
 
 bin_PROGRAMS = 
