@@ -376,6 +376,7 @@ create_seafile_json (int repo_version,
                      char *seafile_id)
 {
     json_t *object, *block_id_array;
+    json_t *offset_array;
 
     object = json_object ();
 
@@ -395,6 +396,13 @@ create_seafile_json (int repo_version,
         ptr += 20;
     }
     json_object_set_new (object, "block_ids", block_id_array);
+
+    /* Add the chunk offsets to the JSON dump. */
+    offset_array = json_array();
+    for (i = 0; i < cdc->block_nr; ++i) {
+        json_array_append_new (offset_array, json_integer(cdc->blk_offsets[i]));
+    }
+    json_object_set_new (object, "block_offsets", offset_array);
 
     char *data = json_dumps (object, JSON_SORT_KEYS);
     *ondisk_size = strlen(data);
@@ -825,6 +833,7 @@ seaf_fs_manager_index_blocks (SeafFSManager *mgr,
 
         if (write_data && write_seafile (mgr, repo_id, version, &cdc, sha1) < 0) {
             g_free (cdc.blk_sha1s);
+            free (cdc.blk_offsets);
             seaf_warning ("Failed to write seafile for %s.\n", file_path);
             return -1;
         }
@@ -834,6 +843,10 @@ seaf_fs_manager_index_blocks (SeafFSManager *mgr,
 
     if (cdc.blk_sha1s)
         free (cdc.blk_sha1s);
+
+    if (cdc.blk_offsets) {
+        free (cdc.blk_offsets);
+    }
 
     return 0;
 }
@@ -989,6 +1002,10 @@ seafile_free (Seafile *seafile)
         for (i = 0; i < seafile->n_blocks; ++i)
             g_free (seafile->blk_sha1s[i]);
         g_free (seafile->blk_sha1s);
+
+        if (seafile->blk_offsets) {
+            g_free (seafile->blk_offsets);
+        }
     }
 
     g_free (seafile);
@@ -1054,6 +1071,7 @@ static Seafile *
 seafile_from_json_object (const char *id, json_t *object)
 {
     json_t *block_id_array = NULL;
+    json_t *block_offset_array = NULL;
     int type;
     int version;
     guint64 file_size;
@@ -1081,6 +1099,12 @@ seafile_from_json_object (const char *id, json_t *object)
         return NULL;
     }
 
+    block_offset_array = json_object_get (object, "block_offsets");
+    if (!block_offset_array) {
+        seaf_debug ("No block offset array in seafile object %s.\n", id);
+        return NULL;
+    }
+
     seafile = g_new0 (Seafile, 1);
 
     seafile->object.type = SEAF_METADATA_TYPE_FILE;
@@ -1090,6 +1114,7 @@ seafile_from_json_object (const char *id, json_t *object)
     seafile->file_size = file_size;
     seafile->n_blocks = json_array_size (block_id_array);
     seafile->blk_sha1s = g_new0 (char *, seafile->n_blocks);
+    seafile->blk_offsets = g_new0 (uint64_t, seafile->n_blocks);
 
     int i;
     json_t *block_id_obj;
@@ -1102,6 +1127,14 @@ seafile_from_json_object (const char *id, json_t *object)
             return NULL;
         }
         seafile->blk_sha1s[i] = g_strdup(block_id);
+    }
+
+    json_t *block_offset_obj;
+    json_int_t block_offset;
+    for (i = 0; i < seafile->n_blocks; ++i) {
+        block_offset_obj = json_array_get(block_offset_array, i);
+        block_offset = json_integer_value(block_offset_obj);
+        seafile->blk_offsets[i] = (uint64_t) block_offset;
     }
 
     seafile->ref_count = 1;
